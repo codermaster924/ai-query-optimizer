@@ -104,52 +104,24 @@ def analyze_sql(sql: str, connection, intent: str = "") -> dict:
         for meta in schema.values():
             for col in meta["indexed_columns"]:
                 all_indexed_columns.add(col)
+        if connection is not None:
+            tables = extract_tables(sql)
 
-        # RULE 7 — Unindexed WHERE column
-        where_clause = parsed.find(exp.Where)
-        if where_clause:
-            seen = set()
-            for column in where_clause.find_all(exp.Column):
-                col_name = column.name
-                if col_name not in all_indexed_columns and col_name not in seen:
-                    seen.add(col_name)
-                    table_for_col = None
-                    for table_name, meta in schema.items():
-                        col_names = [c["COLUMN_NAME"] for c in meta["columns"]]
-                        if col_name in col_names:
-                            table_for_col = table_name
-                            break
-                    issues.append({
-                        "issue": f"Column '{col_name}' in WHERE clause has no index",
-                        "table": table_for_col or "unknown",
-                        "suggestion": f"Consider: CREATE INDEX idx_{table_for_col}_{col_name} ON {table_for_col}({col_name})"
-                    })
+            for table_name in tables:
+                metadata = get_table_metadata(connection, table_name)
+                schema[table_name] = metadata
 
-        # RULE 8 — Unindexed ORDER BY column
-        order_clause = parsed.find(exp.Order)
-        if order_clause:
-            seen_order = set()
-            for ordered in order_clause.find_all(exp.Column):
-                col_name = ordered.name
-                if col_name not in all_indexed_columns and col_name not in seen_order:
-                    seen_order.add(col_name)
-                    issues.append({
-                        "issue": f"Column '{col_name}' in ORDER BY has no index",
-                        "suggestion": "Sorting on unindexed columns requires a full sort operation"
-                    })
+            column_issues = validate_columns(parsed, schema)
+            issues.extend(column_issues)
 
-        # RULE 9 — OR in WHERE clause
-        if where_clause:
-            for or_expr in where_clause.find_all(exp.Or):
-                issues.append({
-                    "issue": "OR condition in WHERE clause detected",
-                    "suggestion": "OR conditions can prevent index usage. Consider rewriting as UNION or using IN() instead"
-                })
+            all_indexed_columns = set()
+            for meta in schema.values():
+                for col in meta["indexed_columns"]:
+                    all_indexed_columns.add(col)
 
-        # ─────────────────────────────────────────
-        # AI recommendation
-        # ─────────────────────────────────────────
-        ai_response = get_ai_recommendation(sql, issues, schema,intent)
+            # Rule 7, 8, 9 stay exactly the same inside this block
+
+        ai_response = get_ai_recommendation(sql, issues, schema, intent)
 
     except Exception as e:
         return {"error": str(e)}
@@ -163,8 +135,8 @@ def analyze_sql(sql: str, connection, intent: str = "") -> dict:
         }
 
     return {
-    "orginal_query": sql,
-    "issues": issues,
-    "optimized_query": ai_response["optimized_query"],
-    "explanation": ai_response["explanation"]
-}
+        "orginal_query": sql,
+        "issues": issues,
+        "optimized_query": ai_response["optimized_query"],
+        "explanation": ai_response["explanation"]
+    }

@@ -45,6 +45,5 @@ def analyze_query(query: QueryInput):
     try:
         connection = get_connection()
     except Exception as e:
-        return {"error": str(e)}
-
+        connection=None
     return analyze_sql(query.sql_query, connection,query.intent)
