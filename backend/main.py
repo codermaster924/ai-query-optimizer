@@ -22,7 +22,7 @@ class DatabaseConfig(BaseModel):
 
 class QueryInput(BaseModel):
     sql_query: str
-
+    intent: str = ""
 
 @app.get("/")
 def home():
@@ -47,4 +47,4 @@ def analyze_query(query: QueryInput):
     except Exception as e:
         return {"error": str(e)}
 
-    return analyze_sql(query.sql_query, connection)
+    return analyze_sql(query.sql_query, connection,query.intent)

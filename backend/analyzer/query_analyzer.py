@@ -6,7 +6,7 @@ from ai.ai_optimizer import get_ai_recommendation
 from analyzer.column_validator import validate_columns
 
 
-def analyze_sql(sql: str, connection) -> dict:
+def analyze_sql(sql: str, connection, intent: str = "") -> dict:
 
     issues = []
     schema = {}
@@ -149,7 +149,7 @@ def analyze_sql(sql: str, connection) -> dict:
         # ─────────────────────────────────────────
         # AI recommendation
         # ─────────────────────────────────────────
-        ai_response = get_ai_recommendation(sql, issues, schema)
+        ai_response = get_ai_recommendation(sql, issues, schema,intent)
 
     except Exception as e:
         return {"error": str(e)}
@@ -158,11 +158,13 @@ def analyze_sql(sql: str, connection) -> dict:
         return {
             "orginal_query": sql,
             "message": "No obvious issues found",
-            "ai_recommendations": ai_response
+            "optimized_query": ai_response["optimized_query"],
+            "explanation": ai_response["explanation"]
         }
 
     return {
-        "orginal_query": sql,
-        "issues": issues,
-        "ai_recommendations": ai_response
-    }
+    "orginal_query": sql,
+    "issues": issues,
+    "optimized_query": ai_response["optimized_query"],
+    "explanation": ai_response["explanation"]
+}

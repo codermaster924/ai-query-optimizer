@@ -6,7 +6,7 @@ client = OpenAI(
 )
 
 
-def get_ai_recommendation(sql: str, issues: list, schema: dict) -> str:
+def get_ai_recommendation(sql: str, issues: list, schema: dict, intent: str = "") -> str:
 
     issues_text = "\n".join([
         f"- {i['issue']}: {i.get('suggestion', '')}"
@@ -21,6 +21,8 @@ def get_ai_recommendation(sql: str, issues: list, schema: dict) -> str:
         for table, meta in schema.items()
     ])
 
+    intent_text = f"\nOptimization goal: {intent}" if intent else ""
+
     prompt = f"""
 You are an expert database query optimizer.
 
@@ -32,18 +34,19 @@ Schema information:
 
 Issues detected:
 {issues_text}
+{intent_text}
 
 Your job:
 1. Write an optimized version of the query
 2. Explain every change you made and why it helps performance
 3. Be specific — mention indexes, column selection, join order
 
-Respond in this format:
+Respond EXACTLY in this format and no other:
 OPTIMIZED QUERY:
-<write the optimized SQL here>
+<only the SQL here, no explanation>
 
 EXPLANATION:
-<write your explanation here>
+<only the explanation here, no SQL>
 """
 
     response = client.chat.completions.create(
@@ -59,5 +62,18 @@ EXPLANATION:
             }
         ]
     )
+    raw = response.choices[0].message.content
+    optimized_query = ""
+    explanation = ""
 
-    return response.choices[0].message.content
+    if "OPTIMIZED QUERY:" in raw and "EXPLANATION:" in raw:
+        parts = raw.split("EXPLANATION:")
+        optimized_query = parts[0].replace("OPTIMIZED QUERY:", "").strip()
+        explanation = parts[1].strip()
+    else:
+        explanation = raw
+
+    return {
+        "optimized_query": optimized_query,
+        "explanation": explanation
+    }
